@@ -1,0 +1,20 @@
+[project]
+name = "supply-chain-sim"
+version = "0.1.0"
+description = "AI agent acts as global supply chain operations manager, optimizing procurement, inventory, logistics, and supplier decisions under uncertainty"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "openenv-core",
+    "fastapi",
+    "uvicorn",
+    "pydantic",
+    "numpy",
+    "scipy",
+    "openai",
+    "python-dotenv",
+]
+
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.backends._legacy:_Backend"
