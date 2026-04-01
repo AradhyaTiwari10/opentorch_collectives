@@ -46,14 +46,21 @@ class SupplyChainEnvironment(Environment):
     All public methods (``reset``, ``step``, ``state``) are **async** as
     required by the OpenEnv contract and project rule #8.
     """
+    
+    _global_rng = np.random.RandomState(seed=_SEED)
+    _global_dynamics = SupplyChainDynamics()
+    _global_env_state: dict[str, Any] = {}
+    _global_episode_id: str = ""
+    _global_step_count: int = 0
+    _global_max_steps: int = _MAX_STEPS
 
     def __init__(self) -> None:
-        self._rng = np.random.RandomState(seed=_SEED)
-        self._dynamics = SupplyChainDynamics()
-        self._env_state: dict[str, Any] = {}
-        self._episode_id: str = ""
-        self._step_count: int = 0
-        self._max_steps: int = _MAX_STEPS
+        self._rng = SupplyChainEnvironment._global_rng
+        self._dynamics = SupplyChainEnvironment._global_dynamics
+        self._env_state = SupplyChainEnvironment._global_env_state
+        self._episode_id = SupplyChainEnvironment._global_episode_id
+        self._step_count = SupplyChainEnvironment._global_step_count
+        self._max_steps = SupplyChainEnvironment._global_max_steps
 
     # ── Reset ──────────────────────────────────────────────────────────
 
@@ -92,6 +99,12 @@ class SupplyChainEnvironment(Environment):
             "_period_order_costs": 0.0,
         }
 
+        # Sync class variables for stateless HTTP server wrapper workaround
+        SupplyChainEnvironment._global_env_state = self._env_state
+        SupplyChainEnvironment._global_episode_id = self._episode_id
+        SupplyChainEnvironment._global_step_count = self._step_count
+        SupplyChainEnvironment._global_max_steps = self._max_steps
+
         return self._build_observation(
             message="Episode started. You manage a supply chain with "
             f"{len(PRODUCTS)} products and {len(SUPPLIERS)} suppliers.",
@@ -121,6 +134,10 @@ class SupplyChainEnvironment(Environment):
         )
 
         self._step_count += 1
+        
+        # Sync class variables for stateless HTTP server wrapper workaround
+        SupplyChainEnvironment._global_env_state = self._env_state
+        SupplyChainEnvironment._global_step_count = self._step_count
 
         # 3. Check termination
         done = self._dynamics.check_done(self._env_state)

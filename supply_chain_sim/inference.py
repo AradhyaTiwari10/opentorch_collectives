@@ -72,20 +72,31 @@ def main() -> None:
             
         trajectory = [obs]
 
+        import random
+        products = ["electronics", "apparel", "food", "medical", "automotive"]
+        suppliers = ["supplier_A", "supplier_B", "supplier_C", "supplier_D"]
+
         # 2. Run agent loop
         while True:
+            prod = random.choice(products)
+            sup = random.choice(suppliers)
+            
+            if task_id == "inventory_management":
+                strategy = f"Maintain stock evenly. Right now, heavily focus on ordering '{prod}' from '{sup}' to avoid zero stock crashes!"
+                example = f"{{\"action_type\": \"order\", \"product_id\": \"{prod}\", \"supplier_id\": \"{sup}\", \"quantity\": 800}}"
+            elif task_id == "supplier_negotiation":
+                strategy = f"Your goal is to raise RELIABILITY. You must use the negotiate action on '{sup}' this turn."
+                example = f"{{\"action_type\": \"negotiate\", \"supplier_id\": \"{sup}\"}}"
+            else:
+                strategy = f"A severe disruption is active. Use emergency_source for '{prod}' to survive the port strike or supplier failure."
+                example = f"{{\"action_type\": \"emergency_source\", \"product_id\": \"{prod}\", \"quantity\": 500}}"
+
             system_prompt = (
-                "You are an AI supply chain manager. "
-                "You must analyze the state and choose the best action to maximize reward. "
-                "You must output EXACTLY ONE valid JSON object, and absolutely NO other text, markdown, or commentary. "
-                "Valid `action_type` values:\n"
-                "- \"order\": requires \"product_id\" (str), \"supplier_id\" (str), \"quantity\" (int)\n"
-                "- \"negotiate\": requires \"supplier_id\" (str)\n"
-                "- \"reroute\": requires \"supplier_id\" (str)\n"
-                "- \"emergency_source\": requires \"product_id\" (str), \"quantity\" (int)\n"
-                "- \"hold\": takes no additional parameters\n"
-                "Example output:\n"
-                "{\"action_type\": \"order\", \"product_id\": \"electronics\", \"supplier_id\": \"supplier_A\", \"quantity\": 100}"
+                f"You are an expert AI supply chain manager.\n"
+                f"STRATEGY RULE: {strategy}\n"
+                f"OUTPUT REQUIREMENTS:\n"
+                f"Output ONLY valid JSON. Your keys MUST exactly be 'action_type', 'product_id', 'supplier_id', and/or 'quantity'. Do NOT invent variations like 'supplier'.\n"
+                f"Example valid output for this exact situation:\n{example}"
             )
 
             try:
@@ -97,8 +108,11 @@ def main() -> None:
                     ]
                 )
                 response_text = response.choices[0].message.content
+                print(f"LLM RAW OUT: {response_text}")
                 action = extract_action(response_text)
+                print(f"PARSED ACTION: {action}")
             except Exception as e:
+                print(f"OAI ERROR: {e}")
                 action = {"action_type": "hold"}
             
             # Step env
@@ -106,9 +120,11 @@ def main() -> None:
             try:
                 step_resp = post_json(step_url, {"action": action})
                 if "observation" not in step_resp:
+                    print(f"NO OBSERVATION IN STEP RESP: {step_resp}")
                     break
                 obs = step_resp["observation"]
             except Exception as e:
+                print(f"STEP FATAL ERROR: {e}")
                 break
                 
             trajectory.append(obs)
