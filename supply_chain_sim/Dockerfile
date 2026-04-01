@@ -1,6 +1,13 @@
 FROM ghcr.io/meta-pytorch/openenv-base:latest
 
+RUN useradd -m -u 1000 user
+USER user
+ENV PATH="/home/user/.local/bin:$PATH"
+
 WORKDIR /app
+USER root
+RUN chown -R user:user /app
+USER user
 
 ENV ENABLE_WEB_INTERFACE=true
 ENV PYTHONUNBUFFERED=1
@@ -8,13 +15,13 @@ ENV ENVIRONMENT=production
 ENV PORT=7860
 
 # Copy dependency definition files first for layer caching
-COPY pyproject.toml uv.lock* ./
+COPY --chown=user pyproject.toml uv.lock* ./
 
 # Install dependencies using uv sync
 RUN uv sync
 
 # Copy source code
-COPY . .
+COPY --chown=user . .
 
 EXPOSE 7860
 
