@@ -94,10 +94,16 @@ def _grade_supplier_negotiation(
 
     cash_balance: float = float(final_step.get("cash_balance", 0.0))
 
-    reliability_ratio = mean_reliability / target_reliability if target_reliability else 0.0
-    cash_ratio = cash_balance / initial_cash if initial_cash else 0.0
+    # Delta logic: ensure 'hold' completely fails (score 0) since initial is 0.86
+    start_reliability = 0.86
+    if mean_reliability <= start_reliability:
+        rel_score = 0.0
+    else:
+        rel_score = (mean_reliability - start_reliability) / (target_reliability - start_reliability)
 
-    score = _clamp(reliability_ratio * cash_ratio)
+    cash_ratio = max(0.0, cash_balance / initial_cash) if initial_cash else 0.0
+
+    score = _clamp(rel_score * cash_ratio)
 
     passed = mean_reliability >= target_reliability and cash_balance > min_cash
 

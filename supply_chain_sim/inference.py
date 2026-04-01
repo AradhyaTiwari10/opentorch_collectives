@@ -55,7 +55,6 @@ def main() -> None:
     client = OpenAI(base_url=API_BASE_URL, api_key=HF_TOKEN)
 
     tasks = ["inventory_management", "supplier_negotiation", "disruption_response"]
-    max_steps = 8
     scores = []
 
     for task_id in tasks:
@@ -74,18 +73,32 @@ def main() -> None:
         trajectory = [obs]
 
         # 2. Run agent loop
-        for _ in range(max_steps):
+        while True:
+            system_prompt = (
+                "You are an AI supply chain manager. "
+                "You must analyze the state and choose the best action to maximize reward. "
+                "You must output EXACTLY ONE valid JSON object, and absolutely NO other text, markdown, or commentary. "
+                "Valid `action_type` values:\n"
+                "- \"order\": requires \"product_id\" (str), \"supplier_id\" (str), \"quantity\" (int)\n"
+                "- \"negotiate\": requires \"supplier_id\" (str)\n"
+                "- \"reroute\": requires \"supplier_id\" (str)\n"
+                "- \"emergency_source\": requires \"product_id\" (str), \"quantity\" (int)\n"
+                "- \"hold\": takes no additional parameters\n"
+                "Example output:\n"
+                "{\"action_type\": \"order\", \"product_id\": \"electronics\", \"supplier_id\": \"supplier_A\", \"quantity\": 100}"
+            )
+
             try:
                 response = client.chat.completions.create(
                     model=MODEL_NAME,
                     messages=[
-                        {"role": "system", "content": "You are a supply chain manager. Analyze the state and choose the best action."},
+                        {"role": "system", "content": system_prompt},
                         {"role": "user", "content": json.dumps(obs)}
                     ]
                 )
                 response_text = response.choices[0].message.content
                 action = extract_action(response_text)
-            except Exception:
+            except Exception as e:
                 action = {"action_type": "hold"}
             
             # Step env
@@ -95,7 +108,7 @@ def main() -> None:
                 if "observation" not in step_resp:
                     break
                 obs = step_resp["observation"]
-            except Exception:
+            except Exception as e:
                 break
                 
             trajectory.append(obs)

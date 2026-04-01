@@ -69,6 +69,12 @@ class SupplyChainEnvironment(Environment):
         self._episode_id = episode_id or str(uuid.uuid4())
         self._step_count = 0
 
+        from server.tasks import TASK_REGISTRY
+        task_cfg = TASK_REGISTRY.get(self._episode_id)
+        
+        starting_cash = task_cfg.initial_cash if task_cfg else _INITIAL_CASH
+        self._max_steps = task_cfg.max_steps if task_cfg else _MAX_STEPS
+
         self._env_state = {
             "inventory_levels": {p: _INITIAL_INVENTORY for p in PRODUCTS},
             "pending_orders": [],
@@ -81,7 +87,7 @@ class SupplyChainEnvironment(Environment):
             "period": 0,
             "disruption_active": False,
             "disruption_type": None,
-            "cash_balance": _INITIAL_CASH,
+            "cash_balance": starting_cash,
             "max_steps": self._max_steps,
             "_period_order_costs": 0.0,
         }
