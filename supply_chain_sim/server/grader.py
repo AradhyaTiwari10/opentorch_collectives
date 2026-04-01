@@ -84,7 +84,7 @@ def _grade_supplier_negotiation(
     final_step = trajectory[-1]
 
     # Mean supplier reliability at end of episode
-    reliabilities: dict[str, float] = final_step.get(
+    reliabilities: dict[str, float] = final_step.get("metrics", {}).get(
         "supplier_reliability", {},
     )
     if reliabilities:
@@ -92,7 +92,7 @@ def _grade_supplier_negotiation(
     else:
         mean_reliability = 0.0
 
-    cash_balance: float = float(final_step.get("cash_balance", 0.0))
+    cash_balance: float = float(final_step.get("metrics", {}).get("cash_balance", 0.0))
 
     # Delta logic: ensure 'hold' completely fails (score 0) since initial is 0.86
     start_reliability = 0.86
@@ -158,7 +158,7 @@ def _grade_disruption_response(
         periods_above = sum(
             1
             for step in post_disruption
-            if float(step.get("service_level", 0.0)) >= threshold
+            if float(step.get("metrics", {}).get("service_level", 0.0)) >= threshold
         )
 
         # recovery_speed = fraction of the window that was above threshold

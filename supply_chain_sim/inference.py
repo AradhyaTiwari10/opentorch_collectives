@@ -32,8 +32,11 @@ def extract_action(response_text: str) -> dict:
         if start_idx != -1 and end_idx != -1:
             action_json = response_text[start_idx:end_idx+1]
             action = json.loads(action_json)
-            if "action_type" in action:
-                return action
+            # basic check
+            valid_types = {"order", "negotiate", "reroute", "hold", "emergency_source"}
+            if action.get("action_type") not in valid_types:
+                return {"action_type": "hold"}
+            return action
     except Exception:
         pass
     
