@@ -32,23 +32,28 @@ def _clamp(value: float, lo: float = 0.0, hi: float = 1.0) -> float:
 def _grade_inventory_management(
     trajectory: list[dict[str, Any]],
 ) -> TaskResult:
-    """EASY — score = periods_with_service ≥ 0.80 / 10 (last 10 periods)."""
+    """EASY — score = fraction of all periods with service_level >= threshold."""
 
     task_cfg = TASK_REGISTRY["inventory_management"]
     threshold: float = task_cfg.success_criteria["service_level_threshold"]
     target_periods: int = task_cfg.success_criteria["consecutive_periods"]
 
-    # Count how many of the *last 10* periods had service_level >= threshold
-    relevant = trajectory[-target_periods:] if len(trajectory) >= target_periods else trajectory
+    if not trajectory:
+        return TaskResult(
+            task_id="inventory_management",
+            score=0.0,
+            passed=False,
+            details={"error": "empty trajectory"},
+        )
+
+    # Score over ALL periods (not just last 10) for a fairer metric
     periods_above = sum(
         1
-        for step in relevant
+        for step in trajectory
         if float(step.get("service_level", 0.0)) >= threshold
     )
 
-    score = _clamp(periods_above / target_periods)
-
-    # Passed only if ALL 10 were above threshold
+    score = _clamp(periods_above / max(len(trajectory), target_periods))
     passed = periods_above >= target_periods
 
     return TaskResult(
@@ -57,6 +62,7 @@ def _grade_inventory_management(
         passed=passed,
         details={
             "periods_above_threshold": periods_above,
+            "total_periods": len(trajectory),
             "target_periods": target_periods,
             "threshold": threshold,
         },
@@ -95,15 +101,25 @@ def _grade_supplier_negotiation(
     cash_balance: float = float(final_step.get("cash_balance", 0.0))
 
     # Delta logic: ensure 'hold' completely fails (score 0) since initial is 0.86
-    start_reliability = 0.86
+    start_reliability = 0.86  # mean of _INITIAL_RELIABILITY
     if mean_reliability <= start_reliability:
         rel_score = 0.0
     else:
-        rel_score = (mean_reliability - start_reliability) / (target_reliability - start_reliability)
+        rel_score = _clamp(
+            (mean_reliability - start_reliability) / (target_reliability - start_reliability)
+        )
 
-    cash_ratio = max(0.0, cash_balance / initial_cash) if initial_cash else 0.0
+    # Cash score: partial credit as long as agent didn't go deeply negative
+    # 1.0 if cash >= min_cash, 0.5 if at break-even, 0.0 if bankrupt
+    if cash_balance >= min_cash:
+        cash_score = 1.0
+    elif cash_balance > 0:
+        cash_score = cash_balance / min_cash
+    else:
+        cash_score = 0.0
 
-    score = _clamp(rel_score * cash_ratio)
+    # Weighted combination: reliability matters more (70%) than cash (30%)
+    score = _clamp(0.70 * rel_score + 0.30 * cash_score)
 
     passed = mean_reliability >= target_reliability and cash_balance > min_cash
 
@@ -144,10 +160,12 @@ def _grade_disruption_response(
     all_recovered = True
 
     for d_period in disruption_periods:
-        # Look at the *window* periods after the disruption
-        start_idx = d_period  # period is 0-indexed in trajectory
-        end_idx = min(start_idx + window, len(trajectory))
-        post_disruption = trajectory[start_idx:end_idx]
+        # Find steps that fall within the recovery window after the disruption
+        # Match by the 'period' field in each step (period is 1-indexed after advance)
+        post_disruption = [
+            step for step in trajectory
+            if d_period < step.get("period", -1) <= d_period + window
+        ]
 
         if not post_disruption:
             recovery_scores.append(0.0)

@@ -128,6 +128,20 @@ class SupplyChainEnvironment(Environment):
             self._env_state, action_dict, self._rng,
         )
 
+        # 1b. Inject forced disruptions from task config (before period advance)
+        from server.tasks import TASK_REGISTRY as _TR
+        _task_cfg = _TR.get(self._episode_id)
+        if _task_cfg and _task_cfg.forced_events:
+            _current_period = self._env_state.get("period", 0)
+            _event = _task_cfg.forced_events.get(_current_period)
+            if _event:
+                self._env_state["disruption_active"] = True
+                self._env_state["disruption_type"] = _event
+            elif not _task_cfg.disruptions_enabled:
+                # Clear disruption when no random events enabled
+                self._env_state["disruption_active"] = False
+                self._env_state["disruption_type"] = None
+
         # 2. Advance the period (demand, deliveries, costs)
         self._env_state = self._dynamics.advance_period(
             self._env_state, self._rng,
