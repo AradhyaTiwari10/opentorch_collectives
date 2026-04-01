@@ -39,10 +39,10 @@ This simulation is highly valuable for Reinforcement Learning (RL) research as i
 | action_type | parameters | effect |
 | :--- | :--- | :--- |
 | `order` | `product_id`, `supplier_id`, `quantity` | Places an order with 3-7 days ETA subject to supplier reliability. |
-| `negotiate` | `supplier_id` | Pays $5000 fee to increase supplier reliability by 0.02-0.05. |
-| `reroute` | `supplier_id` | Pays $8000 fee to redirect the oldest pending order to a new supplier with rerolled ETA. |
-| `hold` | none | Do nothing. Incurs a small $10 structural penalty. |
-| `emergency_source` | `product_id`, `quantity` | Instant delivery ensuring inventory but at 3× the normal order cost. |
+| `negotiate` | `supplier_id` | Pays $1,000 fee to increase supplier reliability by 0.02-0.05. |
+| `reroute` | `supplier_id` | Pays $2,000 fee to redirect the oldest pending order to a new supplier with rerolled ETA. |
+| `hold` | none | Do nothing. Incurs a small $5 structural penalty. |
+| `emergency_source` | `product_id`, `quantity` | Instant delivery ensuring inventory but at 2× the normal order cost. |
 
 ## Reward Function
 The total reward is a weighted sum of normalized cost, service efficiency, and disruption resilience metrics:
@@ -61,14 +61,14 @@ The total reward is a weighted sum of normalized cost, service efficiency, and d
 | `disruption_response` | hard | Recover service_level to >= 0.75 within 5 periods of each forced disruption (port_strike at period 3, supplier_failure at period 8). | `service_level >= 0.75` within 5 periods of both events | 25 |
 
 ## Baseline Scores
-| Task | Baseline Score | Model |
-| :--- | :--- | :--- |
-| `inventory_management` | 0.000 | Hold Fallback Agent (`inference.py`) |
-| `supplier_negotiation` | 0.000 | Hold Fallback Agent (`inference.py`) |
-| `disruption_response` | 0.000 | Hold Fallback Agent (`inference.py`) |
-| `inventory_management` | 0.300 | Random / Pre-computed Baseline |
-| `supplier_negotiation` | 0.200 | Random / Pre-computed Baseline |
-| `disruption_response` | 0.100 | Random / Pre-computed Baseline |
+Scores produced by running `inference.py` with `meta-llama/Llama-3.3-70B-Instruct` via HF Inference Providers against the live HF Space (seed=42).
+
+| Task | Baseline Score |
+| :--- | :--- |
+| `inventory_management` | 0.500 |
+| `supplier_negotiation` | 0.416 |
+| `disruption_response` | 0.700 |
+| **Overall Mean** | **0.539** |
 
 ## Setup & Usage
 
@@ -98,4 +98,4 @@ curl http://localhost:8000/tasks
 ## OpenEnv Compliance
 - openenv validate: ✅ passes
 - Dockerfile: ✅ builds  
-- HF Space: ✅ deployed at https://aradhyatiwari10-supply-chain-sim.hf.space
+- HF Space: ✅ deployed at https://aradhya10-supply-chain-sim.hf.space
