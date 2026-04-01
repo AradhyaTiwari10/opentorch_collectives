@@ -9,4 +9,4 @@ These rules **must** be followed in every file across the project.
 5. **Grader scores must always be a float between `0.0` and `1.0`.**
 6. **Never use `localhost` in `inference.py`** — always use the live HF Space URL from env var `SPACE_URL`.
 7. **Dockerfile must use `openenv-base` image with `uv sync`.**
-8. **`step()`, `reset()`, `state()` must be `async`.**
+8. **`step()`, `reset()` must be sync functions; `state` must be a `@property`** — the openenv framework wraps them async internally.

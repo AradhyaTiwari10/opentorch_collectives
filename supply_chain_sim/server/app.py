@@ -78,11 +78,20 @@ async def get_baselines() -> Dict[str, float]:
     }
 
 
+# Remove existing health route added by create_fastapi_app
+app.router.routes[:] = [r for r in app.router.routes if getattr(r, "path", None) != "/health"]
+
 @app.get("/health")
 async def health_check() -> Dict[str, str]:
     """Return basic health and version information."""
     return {
         "status": "ok",
-        "env": "supply-chain-sim",
-        "version": "1.0.0",
     }
+
+
+def main():
+    import uvicorn
+    uvicorn.run("server.app:app", host="0.0.0.0", port=8000)
+
+if __name__ == "__main__":
+    main()
