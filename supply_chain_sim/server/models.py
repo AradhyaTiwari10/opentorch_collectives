@@ -8,14 +8,14 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
-from openenv.core.models import Action, Observation
+from openenv.core.env_server.types import Action, Observation
 
 # ---------------------------------------------------------------------------
 # Reward base – openenv-core may or may not expose a Reward base class.
 # We try to import it; if unavailable we fall back to plain BaseModel.
 # ---------------------------------------------------------------------------
 try:
-    from openenv.core.models import Reward as _RewardBase
+    from openenv.core.env_server.types import Reward as _RewardBase
 except ImportError:
     _RewardBase = BaseModel  # type: ignore[assignment,misc]
 
