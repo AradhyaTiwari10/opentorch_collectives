@@ -172,6 +172,7 @@ class SupplyChainEnvironment(Environment):
         obs = self._build_observation(
             message=" ".join(msg_parts),
             done=done,
+            action=action,
         )
         return obs
 
@@ -193,9 +194,26 @@ class SupplyChainEnvironment(Environment):
         self,
         message: str = "",
         done: bool = False,
+        action: Optional[SupplyChainAction] = None,
     ) -> SupplyChainObservation:
         """Construct a ``SupplyChainObservation`` from internal state."""
         s = self._env_state
+
+        # Calculate step reward
+        cost_score = max(0.0, min(1.0, 1.0 - (s["current_costs"] / 50000.0)))
+        service_score = max(0.0, min(1.0, float(s["service_level"])))
+        
+        resilience_score = 1.0
+        if s.get("disruption_active"):
+            if action and action.action_type in ["emergency_source", "reroute"]:
+                resilience_score = 0.8
+            elif action and action.action_type == "hold":
+                resilience_score = 0.2
+            else:
+                resilience_score = 0.5
+                
+        total_reward = (0.4 * cost_score) + (0.4 * service_score) + (0.2 * resilience_score)
+
         return SupplyChainObservation(
             inventory_levels=dict(s["inventory_levels"]),
             pending_orders=[dict(o) for o in s["pending_orders"]],
@@ -209,7 +227,7 @@ class SupplyChainEnvironment(Environment):
             cash_balance=s["cash_balance"],
             message=message,
             done=done,
-            reward=0.0,
+            reward=total_reward,
         )
 
     def close(self) -> None:
