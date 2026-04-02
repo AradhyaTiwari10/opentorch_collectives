@@ -1,4 +1,0 @@
-Task 1 - inventory_management: 0.000
-Task 2 - supplier_negotiation: 0.000
-Task 3 - disruption_response: 0.000
-Overall: 0.000

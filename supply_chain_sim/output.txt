@@ -1,7 +1,0 @@
-Starting FastAPI server for testing endpoints...
-Health payload: {"status":"healthy"}
-Reset payload length: 21
-Missing period:0
-Missing cash_balance:500000.0
-Tasks length: 3
-Done
