@@ -27,7 +27,7 @@ import pytest
 
 # ── Shared fixtures ────────────────────────────────────────────────────────
 
-BASE_URL = "http://localhost:8000"
+BASE_URL = "http://localhost:7860"
 
 GOOD_OBS = {
     "inventory_levels": {
@@ -299,7 +299,8 @@ class TestPhase2GraderInventory:
     def test_result_has_details(self):
         traj = [self._make_obs(0.85, i) for i in range(5)]
         result = self.grade("inventory_management", traj)
-        assert "periods_above_threshold" in result.details
+        assert "periods_above_threshold" in result.details  # backward compat
+        assert "longest_streak" in result.details           # consecutive tracking
         assert "threshold" in result.details
 
 
@@ -327,11 +328,12 @@ class TestPhase2GraderSupplierNegotiation:
         assert result.score == 0.0
 
     def test_hold_agent_scores_partial_cash(self):
-        """Agent that never negotiates: reliability stays at 0.86.
-        But since cash is >= min_cash, cash score is 1.0. Total = 0.30 * 1.0 = 0.3"""
+        """Agent that never negotiates: reliability stays at or below initial mean (0.8625).
+        rel_score = 0.0. Cash >= min_cash → cash_score = 1.0. Total = 0.30 * 1.0 = 0.30."""
+        # Use 0.86 < 0.8625 (initial mean) to ensure rel_score = 0
         traj = [self._make_obs(0.86, 250_000)] * 5
         result = self.grade("supplier_negotiation", traj)
-        assert result.score == 0.3, f"Expected 0.3, got {result.score}"
+        assert result.score == pytest.approx(0.30, abs=1e-9), f"Expected 0.30, got {result.score}"
 
     def test_perfect_reliability_and_cash_scores_high(self):
         traj = [self._make_obs(0.95, 250_000)] * 5
@@ -515,7 +517,7 @@ class TestPhase3LocalServer:
     @pytest.fixture(autouse=True)
     def require_server(self):
         if not _server_is_up():
-            pytest.skip("Local server not running on :8000 — run: uvicorn server.app:app --port 8000")
+            pytest.skip("Local server not running on :7860 — run: uvicorn server.app:app --port 7860")
 
     def test_health_returns_ok(self):
         resp = _http_get("/health")

@@ -1,5 +1,10 @@
 name: supply-chain-sim
-description: "AI agent acts as global supply chain operations manager, optimizing procurement, inventory, logistics, and supplier decisions under uncertainty"
+description: >
+  AI agent acts as a global supply chain operations manager, optimising
+  procurement, inventory, logistics, and supplier decisions under uncertainty.
+  Features deterministic forced disruptions, full event lifecycle management,
+  and a novel carbon-footprint tracking mechanic that penalises high-emission
+  emergency sourcing — creating a genuine speed-vs-sustainability trade-off.
 space_url: "https://aradhya10-supply-chain-sim.hf.space"
 github_url: "https://github.com/AradhyaTiwari10/opentorch_collectives"
 tags:
@@ -7,6 +12,8 @@ tags:
   - supply-chain
   - logistics
   - multi-objective
+  - sustainability
+  - carbon-footprint
   - rl
   - real-world
 tasks:

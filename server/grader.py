@@ -14,8 +14,10 @@ from typing import Any
 from server.models import TaskResult
 from server.tasks import TASK_REGISTRY
 
-# ── Seed (used only if a grader ever needs randomness — currently none) ───
-_SEED = 42
+# ── Dynamic starting reliability ──────────────────────────────────────────
+# Imported from environment so grader stays consistent with simulation.
+# Avoids hardcoded literals that drift when _INITIAL_RELIABILITY changes.
+from server.environment import INITIAL_MEAN_RELIABILITY as _START_RELIABILITY
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────
@@ -32,7 +34,12 @@ def _clamp(value: float, lo: float = 0.0, hi: float = 1.0) -> float:
 def _grade_inventory_management(
     trajectory: list[dict[str, Any]],
 ) -> TaskResult:
-    """EASY — score = fraction of all periods with service_level >= threshold."""
+    """EASY — score = longest consecutive streak of periods with service_level >= threshold,
+    normalised by the target number of consecutive periods.
+
+    Uses *consecutive* periods as specified in the task goal, not a simple total count.
+    Partial credit is awarded proportional to the best streak achieved.
+    """
 
     task_cfg = TASK_REGISTRY["inventory_management"]
     threshold: float = task_cfg.success_criteria["service_level_threshold"]
@@ -46,22 +53,31 @@ def _grade_inventory_management(
             details={"error": "empty trajectory"},
         )
 
-    # Score over ALL periods (not just last 10) for a fairer metric
-    periods_above = sum(
-        1
-        for step in trajectory
-        if float(step.get("service_level", 0.0)) >= threshold
-    )
+    # Track longest consecutive streak above threshold
+    longest_streak = 0
+    current_streak = 0
+    total_above = 0   # kept for informational details
 
-    score = _clamp(periods_above / max(len(trajectory), target_periods))
-    passed = periods_above >= target_periods
+    for step in trajectory:
+        if float(step.get("service_level", 0.0)) >= threshold:
+            current_streak += 1
+            total_above += 1
+            if current_streak > longest_streak:
+                longest_streak = current_streak
+        else:
+            current_streak = 0
+
+    # Score: fraction of the required streak actually achieved (clamped to 1.0)
+    score = _clamp(longest_streak / target_periods)
+    passed = longest_streak >= target_periods
 
     return TaskResult(
         task_id="inventory_management",
         score=score,
         passed=passed,
         details={
-            "periods_above_threshold": periods_above,
+            "longest_streak": longest_streak,
+            "periods_above_threshold": total_above,   # kept for backward compat
             "total_periods": len(trajectory),
             "target_periods": target_periods,
             "threshold": threshold,
@@ -72,12 +88,18 @@ def _grade_inventory_management(
 def _grade_supplier_negotiation(
     trajectory: list[dict[str, Any]],
 ) -> TaskResult:
-    """MEDIUM — score = (reliability / 0.92) × (cash / 300k), clamped 0-1."""
+    """MEDIUM — score = 0.70 * rel_score + 0.30 * cash_score, clamped 0-1.
+
+    rel_score: improvement from baseline mean reliability toward the target.
+    cash_score: partial credit for maintaining positive cash balance.
+
+    Baseline uses the dynamically computed INITIAL_MEAN_RELIABILITY so the
+    grader stays consistent with the simulation even if constants change.
+    """
 
     task_cfg = TASK_REGISTRY["supplier_negotiation"]
     target_reliability: float = task_cfg.success_criteria["reliability_target"]
     min_cash: float = task_cfg.success_criteria["min_cash_balance"]
-    initial_cash: float = task_cfg.initial_cash
 
     if not trajectory:
         return TaskResult(
@@ -90,27 +112,26 @@ def _grade_supplier_negotiation(
     final_step = trajectory[-1]
 
     # Mean supplier reliability at end of episode
-    reliabilities: dict[str, float] = final_step.get(
-        "supplier_reliability", {},
+    reliabilities: dict[str, float] = final_step.get("supplier_reliability", {})
+    mean_reliability = (
+        sum(reliabilities.values()) / len(reliabilities)
+        if reliabilities
+        else 0.0
     )
-    if reliabilities:
-        mean_reliability = sum(reliabilities.values()) / len(reliabilities)
-    else:
-        mean_reliability = 0.0
 
     cash_balance: float = float(final_step.get("cash_balance", 0.0))
 
-    # Delta logic: ensure 'hold' completely fails (score 0) since initial is 0.86
-    start_reliability = 0.86  # mean of _INITIAL_RELIABILITY
-    if mean_reliability <= start_reliability:
+    # Reliability score: only award credit for improvement above baseline.
+    # A hold agent that never negotiates scores exactly 0.0.
+    if mean_reliability <= _START_RELIABILITY:
         rel_score = 0.0
     else:
         rel_score = _clamp(
-            (mean_reliability - start_reliability) / (target_reliability - start_reliability)
+            (mean_reliability - _START_RELIABILITY)
+            / (target_reliability - _START_RELIABILITY)
         )
 
-    # Cash score: partial credit as long as agent didn't go deeply negative
-    # 1.0 if cash >= min_cash, 0.5 if at break-even, 0.0 if bankrupt
+    # Cash score: partial credit as long as agent didn't go bankrupt
     if cash_balance >= min_cash:
         cash_score = 1.0
     elif cash_balance > 0:
@@ -120,7 +141,6 @@ def _grade_supplier_negotiation(
 
     # Weighted combination: reliability matters more (70%) than cash (30%)
     score = _clamp(0.70 * rel_score + 0.30 * cash_score)
-
     passed = mean_reliability >= target_reliability and cash_balance > min_cash
 
     return TaskResult(
@@ -129,6 +149,7 @@ def _grade_supplier_negotiation(
         passed=passed,
         details={
             "mean_reliability": round(mean_reliability, 4),
+            "start_reliability": round(_START_RELIABILITY, 4),
             "reliability_target": target_reliability,
             "cash_balance": round(cash_balance, 2),
             "min_cash_required": min_cash,
@@ -139,14 +160,18 @@ def _grade_supplier_negotiation(
 def _grade_disruption_response(
     trajectory: list[dict[str, Any]],
 ) -> TaskResult:
-    """HARD — score = average recovery speed across both disruptions."""
+    """HARD — score = average recovery speed across both forced disruptions.
+
+    For each disruption, measures the fraction of the recovery window
+    (next N periods after the disruption) where service_level >= threshold.
+    An agent that recovers immediately scores 1.0 for that disruption;
+    one that never recovers scores 0.0.
+    """
 
     task_cfg = TASK_REGISTRY["disruption_response"]
     threshold: float = task_cfg.success_criteria["service_level_threshold"]
     window: int = task_cfg.success_criteria["recovery_window"]
-    disruption_periods: list[int] = task_cfg.success_criteria[
-        "disruption_periods"
-    ]
+    disruption_periods: list[int] = task_cfg.success_criteria["disruption_periods"]
 
     if not trajectory:
         return TaskResult(
@@ -160,8 +185,7 @@ def _grade_disruption_response(
     all_recovered = True
 
     for d_period in disruption_periods:
-        # Find steps that fall within the recovery window after the disruption
-        # Match by the 'period' field in each step (period is 1-indexed after advance)
+        # Find observations that fall within the recovery window
         post_disruption = [
             step for step in trajectory
             if d_period < step.get("period", -1) <= d_period + window
@@ -172,14 +196,13 @@ def _grade_disruption_response(
             all_recovered = False
             continue
 
-        # Count how many periods in the recovery window met the threshold
         periods_above = sum(
             1
             for step in post_disruption
             if float(step.get("service_level", 0.0)) >= threshold
         )
 
-        # recovery_speed = fraction of the window that was above threshold
+        # Recovery speed = fraction of window that met the threshold
         recovery_speed = periods_above / window if window else 0.0
         recovery_scores.append(_clamp(recovery_speed))
 
@@ -217,9 +240,9 @@ def grade_task(
     task_id: str,
     episode_trajectory: list[dict[str, Any]],
 ) -> TaskResult:
-    """Score a single task. Returns a :class:`TaskResult` with score 0.0-1.0.
+    """Score a single task. Returns a TaskResult with score in 0.0-1.0.
 
-    Pure function — no side-effects, no global state.
+    Pure function — no side-effects, no global state. Fully deterministic.
     """
     grader = _GRADER_MAP.get(task_id)
     if grader is None:
@@ -237,10 +260,10 @@ def run_all_graders(
 ) -> dict[str, TaskResult]:
     """Grade every task whose trajectory is provided.
 
-    Returns a dict mapping ``task_id → TaskResult``.
-    Fully reproducible with seed=42 (all graders are deterministic).
+    Returns a dict mapping task_id → TaskResult.
+    Sorted iteration ensures fully reproducible output order.
     """
-    results: dict[str, TaskResult] = {}
-    for task_id in sorted(trajectories):  # sorted for determinism
-        results[task_id] = grade_task(task_id, trajectories[task_id])
-    return results
+    return {
+        task_id: grade_task(task_id, trajectories[task_id])
+        for task_id in sorted(trajectories)
+    }

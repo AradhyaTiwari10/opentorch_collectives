@@ -16,5 +16,10 @@ dependencies = [
 
 [tool.uv]
 
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+]
+
 [project.scripts]
 server = "server.app:main"

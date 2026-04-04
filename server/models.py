@@ -75,6 +75,15 @@ class SupplyChainObservation(Observation):
         default=0.0,
         description="Available cash balance",
     )
+    carbon_footprint: float = Field(
+        default=0.0,
+        description=(
+            "Cumulative CO2-equivalent emissions (kg) from sourcing decisions this episode. "
+            "emergency_source (air freight) = 5 kg CO2e/unit; "
+            "order (sea/road freight) = 1 kg CO2e/unit. "
+            "Lower is better — penalised in the sustainability_score reward component."
+        ),
+    )
     message: str = Field(
         default="",
         description="Human-readable description of the current state",
@@ -122,19 +131,28 @@ class SupplyChainReward(_RewardBase):
 
     cost_score: float = Field(
         default=0.0,
-        description="Normalised cost-efficiency score",
+        description="Normalised cost-efficiency score (0-1)",
     )
     service_score: float = Field(
         default=0.0,
-        description="Demand fulfilment rate",
+        description="Demand fulfilment rate (0-1)",
     )
     resilience_score: float = Field(
         default=0.0,
-        description="Recovery speed after a disruption",
+        description="Recovery speed / behaviour during active disruption (0-1)",
+    )
+    sustainability_score: float = Field(
+        default=0.0,
+        description=(
+            "Inverse carbon footprint score (0-1). "
+            "Penalises excessive use of high-emission emergency sourcing."
+        ),
     )
     total_reward: float = Field(
         default=0.0,
-        description="Weighted sum of component scores",
+        description=(
+            "Weighted sum: 0.35*cost + 0.35*service + 0.15*resilience + 0.15*sustainability"
+        ),
     )
 
 
