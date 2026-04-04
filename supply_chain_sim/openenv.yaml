@@ -1,7 +1,7 @@
 name: supply-chain-sim
 description: "AI agent acts as global supply chain operations manager, optimizing procurement, inventory, logistics, and supplier decisions under uncertainty"
 space_url: "https://aradhya10-supply-chain-sim.hf.space"
-github_url: "https://github.com/AradhyaTiwari10/opentorch_collectives/tree/main/supply_chain_sim"
+github_url: "https://github.com/AradhyaTiwari10/opentorch_collectives"
 tags:
   - openenv
   - supply-chain

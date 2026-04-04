@@ -8,6 +8,9 @@ import os
 import json
 import urllib.request
 from openai import OpenAI
+from dotenv import load_dotenv
+
+load_dotenv()  # Reads the local .env file
 
 def post_json(url: str, data: dict | list = None) -> dict:
     """Helper to send a JSON POST request and receive a JSON response."""

@@ -8,6 +8,7 @@ import os
 from typing import Any, Dict, List
 
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import RedirectResponse
 
 # Set ENABLE_WEB_INTERFACE=true to provide Gradio UI at /web
 os.environ["ENABLE_WEB_INTERFACE"] = "true"
@@ -39,6 +40,11 @@ async def startup_event() -> None:
 
 
 # ── Custom Endpoints ────────────────────────────────────────────────────────
+
+@app.get("/", include_in_schema=False)
+async def root_redirect():
+    """Redirect users visiting the root URL to the API documentation."""
+    return RedirectResponse(url="/docs")
 
 @app.get("/tasks")
 async def list_tasks() -> List[Dict[str, Any]]:
