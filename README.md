@@ -60,7 +60,7 @@ Scores produced by running `inference.py` with `meta-llama/Llama-3.3-70B-Instruc
 **Docker Environment**
 ```bash
 docker build -t supply-chain-sim .
-docker run -p 8000:8000 supply-chain-sim
+docker run -p 7860:7860 supply-chain-sim
 ```
 
 **Run Agent script**
@@ -68,16 +68,16 @@ docker run -p 8000:8000 supply-chain-sim
 export API_BASE_URL="your-llm-base-url"
 export MODEL_NAME="your-model-name"
 export HF_TOKEN="your-hf-token"
-export SPACE_URL="http://localhost:8000"
+export SPACE_URL="http://localhost:7860"
 
 python inference.py
 ```
 
 **Health & Endpoints Test**
 ```bash
-curl http://localhost:8000/health
-curl -X POST http://localhost:8000/reset
-curl http://localhost:8000/tasks
+curl http://localhost:7860/health
+curl -X POST http://localhost:7860/reset
+curl http://localhost:7860/tasks
 ```
 
 ## OpenEnv Compliance
