@@ -95,6 +95,36 @@ async def health_check() -> Dict[str, str]:
     }
 
 
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+    from fastapi.openapi.utils import get_openapi
+    openapi_schema = get_openapi(
+        title="SupplyChainSim",
+        version="1.0.0",
+        description="OpenEnv Environment",
+        routes=app.routes,
+    )
+    # Patch the step request to remove the {"value": 1} default
+    if "components" in openapi_schema and "schemas" in openapi_schema["components"]:
+        schemas = openapi_schema["components"]["schemas"]
+        for _, schema in schemas.items():
+            if "properties" in schema and "action" in schema["properties"] and "timeout_s" in schema["properties"]:
+                schema["example"] = {
+                    "action": {
+                        "action_type": "order",
+                        "product_id": "electronics",
+                        "supplier_id": "supplier_A",
+                        "quantity": 100
+                    },
+                    "timeout_s": 30
+                }
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+app.openapi = custom_openapi
+
+
 def main():
     import uvicorn
     uvicorn.run("server.app:app", host="0.0.0.0", port=7860)
