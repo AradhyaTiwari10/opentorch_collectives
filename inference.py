@@ -210,9 +210,9 @@ def build_prompt(task_id: str, obs: dict, step: int) -> tuple[str, str]:
 
 def main() -> None:
     # Defaults required by hackathon spec — reflect active inference setup
-    API_BASE_URL = os.getenv("API_BASE_URL") or "https://router.huggingface.co/v1"
-    MODEL_NAME   = os.getenv("MODEL_NAME")   or "meta-llama/Llama-3.3-70B-Instruct"
-    HF_TOKEN     = os.getenv("HF_TOKEN", "")
+    API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
+    MODEL_NAME   = os.getenv("MODEL_NAME", "meta-llama/Llama-3.3-70B-Instruct")
+    HF_TOKEN     = os.getenv("HF_TOKEN")
     SPACE_URL    = os.getenv("SPACE_URL", "https://aradhya10-supply-chain-sim.hf.space")
 
     SPACE_URL = SPACE_URL.rstrip("/")
