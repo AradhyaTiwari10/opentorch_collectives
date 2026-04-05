@@ -4,14 +4,14 @@ test_env.py — Supply Chain Sim Environment Test Suite
 Covers:
   Phase 1 — Python import sanity
   Phase 2 — Offline unit logic (tasks, grader, models, action schema)
-  Phase 3 — Local server smoke test (requires server running on localhost:8000)
+  Phase 3 — Local server smoke test (requires server running on localhost:7860)
 
 Run:
     # Phases 1 & 2 only (no server needed):
     pytest tests/test_env.py -v -m "not server"
 
     # All phases (server must be running):
-    uvicorn server.app:app --port 8000 &
+    uvicorn server.app:app --port 7860 &
     pytest tests/test_env.py -v
 """
 
@@ -508,7 +508,7 @@ class TestPhase2InferenceHelpers:
 class TestPhase3LocalServer:
     """
     Phase 3: Hit all FastAPI endpoints.
-    REQUIRES: uvicorn server.app:app --port 8000 to be running.
+    REQUIRES: uvicorn server.app:app --port 7860 to be running.
 
     Skip automatically if server is not up:
         pytest tests/test_env.py -m "not server"
