@@ -119,6 +119,8 @@ def custom_openapi():
                     },
                     "timeout_s": 30
                 }
+                if "examples" in schema:
+                    del schema["examples"]
     app.openapi_schema = openapi_schema
     return app.openapi_schema
 
