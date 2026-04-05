@@ -121,6 +121,49 @@ def custom_openapi():
                 }
                 if "examples" in schema:
                     del schema["examples"]
+                    
+    # The ultimate UI fix: provide real response examples instead of {"status": "ready"}
+    OBS_EXAMPLE = {
+        "inventory_levels": {
+            "electronics": 1000,
+            "apparel": 1000,
+            "food": 1000,
+            "medical": 1000,
+            "automotive": 1000
+        },
+        "pending_orders": [],
+        "supplier_reliability": {"supplier_A": 0.95, "supplier_B": 0.85, "supplier_C": 0.75, "supplier_D": 0.9},
+        "demand_forecast": {"electronics": 200, "apparel": 150, "food": 300, "medical": 100, "automotive": 80},
+        "current_costs": 0.0,
+        "service_level": 1.0,
+        "period": 0,
+        "disruption_active": False,
+        "disruption_type": None,
+        "cash_balance": 500000.0,
+        "carbon_footprint": 0.0,
+        "message": "Simulation running."
+    }
+    
+    try:
+        reset_json = openapi_schema["paths"]["/reset"]["post"]["responses"]["200"]["content"]["application/json"]
+        reset_json["example"] = {
+            "observation": OBS_EXAMPLE,
+            "reward": None,
+            "done": False
+        }
+    except KeyError:
+        pass
+        
+    try:
+        step_json = openapi_schema["paths"]["/step"]["post"]["responses"]["200"]["content"]["application/json"]
+        step_json["example"] = {
+            "observation": OBS_EXAMPLE,
+            "reward": 0.85,
+            "done": False
+        }
+    except KeyError:
+        pass
+
     app.openapi_schema = openapi_schema
     return app.openapi_schema
 
