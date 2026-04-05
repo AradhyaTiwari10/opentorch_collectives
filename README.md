@@ -116,32 +116,69 @@ Produced by running `inference.py` with `meta-llama/Llama-3.3-70B-Instruct` via 
 
 ---
 
-## Setup & Usage
+## End-to-End Operations Guide
 
-### Docker
+### 1. Interactive Testing via Swagger UI (Browser)
 
+You can manually interact with the environment directly from your browser without code.
+
+1. **Open the interface:** Go to `http://localhost:7860/docs` (or your Hugging Face Space URL + `/docs`).
+2. **Start an Episode:**
+   - Expand `POST /reset` and click **Try it out**.
+   - Input `{ "episode_id": "inventory_management", "seed": 42 }`.
+   - Click **Execute**. Keep note of the returned `observation` state.
+3. **Take Actions:**
+   - Expand `POST /step` and click **Try it out**.
+   - Replace the default payload with a valid action, for example:
+     ```json
+     {
+       "action": {
+         "action_type": "order",
+         "product_id": "electronics",
+         "supplier_id": "supplier_A",
+         "quantity": 200
+       }
+     }
+     ```
+   - Click **Execute**. The response will show your new observation and reward.
+4. **Grade Episode:** Once `done: true` is returned from a step, call `POST /grade/{task_id}` passing the JSON list of all observations returned so far to get your final score.
+
+### 2. Automated Evaluator (Agent Inference)
+
+The complete end-to-end evaluation runs via the provided `inference.py` script.
+
+**Prerequisites:** Set up your environment variables.
+```bash
+export API_BASE_URL="https://router.huggingface.co/v1"  # Or your chosen provider
+export MODEL_NAME="meta-llama/Llama-3.3-70B-Instruct"   # Or your chosen model
+export HF_TOKEN="hf_your_hugging_face_token"            # Model provider token
+export SPACE_URL="http://localhost:7860"                # Your deployed space or localhost
+```
+
+**Run the pipeline:**
+```bash
+python inference.py
+```
+This script will sequentially:
+1. Connect to the running OpenEnv Server (via HTTP).
+2. Reset the environment for each of the 3 specified tasks.
+3. Hook your configured LLM directly to the environment.
+4. Continuously parse LLM outputs into valid JSON Actions.
+5. Print the strictly-formatted `[START]`, `[STEP]`, and `[END]` stdout logs for the grader.
+
+### 3. Local Docker Testing
+
+If you are developing locally, run the space exactly as the grader will:
 ```bash
 docker build -t supply-chain-sim .
 docker run -p 7860:7860 supply-chain-sim
 ```
 
-### Run Inference Script
+### 4. Running Offline Unit Tests
 
+To verify environment dynamics without starting the server:
 ```bash
-export API_BASE_URL="your-llm-base-url"
-export MODEL_NAME="your-model-name"
-export HF_TOKEN="your-hf-token"
-export SPACE_URL="http://localhost:7860"
-
-python inference.py
-```
-
-### Health & Endpoint Smoke Test
-
-```bash
-curl http://localhost:7860/health
-curl -X POST http://localhost:7860/reset
-curl http://localhost:7860/tasks
+pytest tests/ -v -m "not server"
 ```
 
 ### Run Tests (offline unit tests, no server needed)

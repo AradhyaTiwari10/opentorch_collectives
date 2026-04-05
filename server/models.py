@@ -123,6 +123,17 @@ class SupplyChainAction(Action):
         description="Agent reasoning (logged but not used in the sim)",
     )
 
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "action_type": "order",
+                "product_id": "electronics",
+                "supplier_id": "supplier_A",
+                "quantity": 100
+            }
+        }
+    }
+
 
 # ── Reward ─────────────────────────────────────────────────────────────────
 
