@@ -17,6 +17,7 @@ from openenv.core.env_server import Environment
 from server.dynamics import BASE_DEMAND, SupplyChainDynamics
 from server.events import DisruptionEventEngine
 from server.models import SupplyChainAction, SupplyChainObservation
+from server.reward import RewardEngine
 from server.tasks import TASK_REGISTRY
 
 # ── Constants ──────────────────────────────────────────────────────────────
@@ -28,7 +29,6 @@ _INITIAL_INVENTORY = 1_000
 # CO2e emission factors (kg per unit)
 _CARBON_EMERGENCY = 5.0   # air freight
 _CARBON_ORDER = 1.0       # sea / road freight
-_CARBON_CEILING = 100_000.0  # normalisation ceiling for sustainability score
 
 PRODUCTS: list[str] = [
     "electronics",
@@ -247,36 +247,17 @@ class SupplyChainEnvironment(Environment):
         done: bool = False,
         action: Optional[SupplyChainAction] = None,
     ) -> SupplyChainObservation:
-        """Construct a SupplyChainObservation from internal state."""
+        """Construct a SupplyChainObservation from internal state.
+
+        Delegates reward computation to :class:`RewardEngine` for proper
+        separation of concerns — reward weights and formulas live in
+        ``server.reward`` as the single source of truth.
+        """
         s = _g_env_state
+        action_type = action.action_type if action else "hold"
 
-        # cost_score: 1.0 when period cost = 0, 0.0 when cost >= 50k
-        cost_score = max(0.0, min(1.0, 1.0 - (s["current_costs"] / 50_000.0)))
-
-        # service_score: fraction of demand fulfilled this period
-        service_score = max(0.0, min(1.0, float(s["service_level"])))
-
-        # resilience_score: rewards active crisis management over holding
-        resilience_score = 1.0
-        if s.get("disruption_active"):
-            if action and action.action_type in ["emergency_source", "reroute"]:
-                resilience_score = 0.8   # proactive response
-            elif action and action.action_type == "hold":
-                resilience_score = 0.2   # passive — worst during disruption
-            else:
-                resilience_score = 0.5   # ordering / negotiating
-
-        # sustainability_score: penalises cumulative carbon footprint
-        carbon = s.get("carbon_footprint", 0.0)
-        sustainability_score = max(0.0, min(1.0, 1.0 - (carbon / _CARBON_CEILING)))
-
-        # Multi-objective reward (weights sum to 1.0)
-        total_reward = (
-            0.35 * cost_score
-            + 0.35 * service_score
-            + 0.15 * resilience_score
-            + 0.15 * sustainability_score
-        )
+        # Delegate reward computation to RewardEngine
+        reward_result = RewardEngine.compute_reward(s, action_type=action_type)
 
         return SupplyChainObservation(
             inventory_levels=dict(s["inventory_levels"]),
@@ -289,10 +270,10 @@ class SupplyChainEnvironment(Environment):
             disruption_active=s["disruption_active"],
             disruption_type=s["disruption_type"],
             cash_balance=s["cash_balance"],
-            carbon_footprint=carbon,
+            carbon_footprint=s.get("carbon_footprint", 0.0),
             message=message,
             done=done,
-            reward=total_reward,
+            reward=reward_result.total_reward,
         )
 
     def close(self) -> None:
